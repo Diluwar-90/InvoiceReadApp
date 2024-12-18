@@ -2,15 +2,20 @@ package com.example.autoformfillup
 
 import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -21,10 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import coil.compose.rememberAsyncImagePainter
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -36,48 +38,24 @@ import java.io.FileOutputStream
 @Composable
 fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
 
-    var employeeName by remember { mutableStateOf(TextFieldValue("")) }
-    var monthYear by remember { mutableStateOf(TextFieldValue("")) }
+    val scrollState = rememberScrollState()
+
+    var billEntryDate by remember { mutableStateOf(TextFieldValue("")) }
     var billAmount by remember { mutableStateOf(TextFieldValue("")) }
+    var monthYear by remember { mutableStateOf(TextFieldValue("")) }
+    var eligibleBillAmount by remember { mutableStateOf(TextFieldValue("")) }
     var billImageUri by remember { mutableStateOf<Uri?>(null) }
     var hasCameraPermission by rememberSaveable { mutableStateOf(false) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    var expanded by remember { mutableStateOf(false) }
+    var selectedOption by remember { mutableStateOf("-- Select Month --") }
+    val options = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    var billDate by remember { mutableStateOf(TextFieldValue("")) }
+    var receiptNum by remember { mutableStateOf(TextFieldValue("")) }
+    var billPeriodStartDate by remember { mutableStateOf(TextFieldValue("")) }
+    var billPeriodEndDate by remember { mutableStateOf(TextFieldValue("")) }
 
-/*    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            Log.d("BillEntryScreen", "Image URI: $uri")
-            billImageUri = uri
-        }
-    }*/
-
-    /*val context = LocalContext.current
-    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var permissionGranted by remember { mutableStateOf(false) }
-
-    // Check if Camera permission is granted
-    permissionGranted = ContextCompat.checkSelfPermission(
-        context, Manifest.permission.CAMERA
-    ) == PackageManager.PERMISSION_GRANTED
-
-    // Handle permission request
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        permissionGranted = isGranted
-    }
-
-    // Launch camera to capture photo and get result
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        bitmap?.let {
-            capturedImageUri = saveImageToCache(context, bitmap)
-        }
-    }
-*/
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -104,14 +82,10 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
     ) { uri: Uri? ->
         if (uri != null) {
             billImageUri = uri
-            /*processImageFromUri(uri) { extractedText ->
-                Log.d("BillEntryScreen", "Extracted Text: $extractedText")
-                fillFormFromExtractedText(extractedText)
-            }*/
             processImageFromUri(context,uri){ extractedText ->
                 Log.d("BillEntryScreen", "Extracted Text: $extractedText")
                 //fillFormWithExtractedText(extractedText)
-                employeeName = TextFieldValue(extractEmployeeName(extractedText))
+                billAmount = TextFieldValue(extractEmployeeName(extractedText))
                 monthYear = TextFieldValue(extractMonthYear(extractedText))
                 billAmount = TextFieldValue(extractBillAmount(extractedText))
             }
@@ -123,7 +97,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
         topBar = {
             TopAppBar(
                 title = { Text("Mobile Bill Reimbursement") },
-                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color(0xFF6200EA))
+                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color(0xFF6200EA)),
             )
         }
     ) { padding ->
@@ -131,25 +105,123 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
             modifier = Modifier
                 .padding(padding)
                 .padding(16.dp)
+                .verticalScroll(scrollState,true)
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
-            // Employee Name
+
+            //Bill Entry Date
             OutlinedTextField(
-                value = employeeName,
-                onValueChange = { employeeName = it },
-                label = { Text("Employee Name") },
+                value = billEntryDate,
+                onValueChange = {billEntryDate = it},
+                label = { Text("Entry Date") },
+                enabled = true,
+                trailingIcon =
+                    {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "Calendar"
+                        )
+                    },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            //Reimbursement month
+            Box {
+                OutlinedTextField(
+                    value = selectedOption,
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Dropdown",
+                            Modifier.clickable { expanded = true }
+                        )
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    options.forEach { option ->
+                        DropdownMenuItem(
+                            onClick = {
+                                selectedOption = option
+                                expanded = false
+                            },
+                            text =  {
+                                Text(option)
+                            }
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            //Bill Date
+            OutlinedTextField(
+                value = billDate,
+                onValueChange = {billDate = it},
+                label = { Text("Bill Date") },
+                enabled = true,
+                trailingIcon =
+                    {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "Calendar"
+                        )
+                    },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            //Receipt Number
+            OutlinedTextField(
+                value = receiptNum,
+                onValueChange = {receiptNum = it},
+                label = { Text("Receipt Number") },
+                enabled = true,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            //Bill Period Start Date
+            OutlinedTextField(
+                value = billPeriodStartDate,
+                onValueChange = {billPeriodStartDate = it},
+                label = { Text("Bill Period Start Date") },
+                enabled = true,
+                trailingIcon =
+                    {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "Calendar"
+                        )
+                    },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Month and Year
+            //Bill Period End Dade
             OutlinedTextField(
-                value = monthYear,
-                onValueChange = { monthYear = it },
-                label = { Text("Month & Year (MM/YYYY)") },
+                value = billPeriodEndDate,
+                onValueChange = {billPeriodEndDate = it},
+                label = { Text("Bill Period End Date") },
+                enabled = true,
+                trailingIcon =
+                    {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "Calendar"
+                        )
+                    },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -165,15 +237,16 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
             )
 
             Spacer(modifier = Modifier.height(16.dp))
+            // Eligible Bill Amount
+            OutlinedTextField(
+                value = eligibleBillAmount,
+                onValueChange = { eligibleBillAmount = it },
+                label = { Text("Eligible Amount") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
 
-            // Image Picker
-//            Button(
-//                //onClick = { imagePickerLauncher.launch("image/*") },
-//                onClick = { imagePickerLauncher.launch("image/*") },
-//                modifier = Modifier.fillMaxWidth()
-//            ) {
-//                Text("Upload Bill Image")
-//            }
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = { showImageSourceDialog = true },
@@ -199,7 +272,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
             Button(
                 onClick = {
                     val mobileBill = MobileBill(
-                        employeeName = employeeName.text,
+                        employeeName = billAmount.text,
                         monthYear = monthYear.text,
                         billAmount = billAmount.text.toDoubleOrNull() ?: 0.0,
                         billImageUri = billImageUri.toString()
@@ -239,23 +312,6 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
                 )
             }
 
-
-       /*     // Button to request permission
-            if (!permissionGranted) {
-                Button(onClick = {
-                    permissionLauncher.launch(Manifest.permission.CAMERA)
-                }) {
-                    Text("Request Camera Permission")
-                }
-            } else {
-                // Button to open the camera
-                Button(onClick = {
-                    cameraLauncher.launch(null)
-                }) {
-                    Text("Take Photo")
-                }
-            }*/
-
         }
     }
 
@@ -294,8 +350,6 @@ private fun processImageFromUri(mContext: Context, uri: Uri, onSuccess: (String)
                 Log.e("BillEntryScreen", "Failed to recognize text: $e")
             }
     }
-
-
 /**
  * Saves a Bitmap image to the cache directory and returns its URI.
  */
