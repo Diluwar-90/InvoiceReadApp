@@ -49,7 +49,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
 
     var billEntryDate by remember { mutableStateOf("") }
     var billAmount by remember { mutableStateOf("") }
-    var monthYear by remember { mutableStateOf(TextFieldValue("")) }
+    var monthYear by remember { mutableStateOf("") }
     var eligibleBillAmount by remember { mutableStateOf("") }
     var billImageUri by remember { mutableStateOf<Uri?>(null) }
     var hasCameraPermission by rememberSaveable { mutableStateOf(false) }
@@ -60,7 +60,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
     //val options = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
     val options = getPreviousThreeMonths()
     var billDate by remember { mutableStateOf("") }
-    var receiptNum by remember { mutableStateOf(TextFieldValue("")) }
+    var receiptNum by remember { mutableStateOf("") }
     var billPeriodStartDate by remember { mutableStateOf("") }
     var billPeriodEndDate by remember { mutableStateOf("") }
 
@@ -116,11 +116,28 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
         if (uri != null) {
             billImageUri = uri
             processImageFromUri(context,uri){ extractedText ->
+
+                val billingDate = extractBillingDate(extractedText)
+                val result = extractMonthAndYear(billingDate)
+
+                if (result != null) {
+                    println("Month: ${result.first}") // Output will be "Sep"
+                    println("Year: ${result.second}") // Output will be "2024"
+                    monthYear = "${result.first}-${result.second}"
+                    selectedOption = monthYear
+                } else {
+                    println("No match found.")
+                }
+
                 Log.d("BillEntryScreen", "Extracted Text: $extractedText")
                 //fillFormWithExtractedText(extractedText)
-                billAmount = TextFieldValue(extractEmployeeName(extractedText)).toString()
-                monthYear = TextFieldValue(extractMonthYear(extractedText))
-                billAmount = TextFieldValue(extractBillAmount(extractedText)).toString()
+                billEntryDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                //billDate = ""
+                receiptNum = TextFieldValue(extractReceiptNumber(extractedText)).text
+                billDate = convertToISODate(billingDate).toString()
+                billPeriodStartDate = convertToISODate(billingDate).toString()
+                billAmount = extractBillAmount(extractedText)?.let { TextFieldValue(it).text }.toString()
+                handleBillAmountChange(billAmount)
             }
             Log.d("BillEntryScreen", "Extracted Text: $uri")
         }
@@ -374,7 +391,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
                 onClick = {
                     val mobileBill = MobileBill(
                         employeeName = billAmount,
-                        monthYear = monthYear.text,
+                        monthYear = monthYear,
                         billAmount = billAmount.toDoubleOrNull() ?: 0.0,
                         billImageUri = billImageUri.toString()
                     )
@@ -425,19 +442,22 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
 //    billAmount = TextFieldValue(extractBillAmount(text))
 //}
 
-private fun extractEmployeeName(text: String): String {
-    val nameRegex = Regex("Employee\\s*Name:\\s*([A-Za-z ]+)")
-    return nameRegex.find(text)?.groupValues?.get(1) ?: "Unknown"
+private fun extractReceiptNumber(text: String): String {
+    val receiptNumberRegex = Regex("""\d{18,}""")
+    return receiptNumberRegex.find(text)?.value ?: ""
 }
 
-private fun extractMonthYear(text: String): String {
-    val dateRegex = Regex("(\\d{2}/\\d{4})")
-    return dateRegex.find(text)?.value ?: "MM/YYYY"
+private fun extractBillingDate(text: String): String {
+    val dateRegex = Regex("""\d{1,2}\s\w{3}\s\d{4}""")
+    return dateRegex.find(text)?.value ?: ""
 }
 
-private fun extractBillAmount(text: String): String {
-    val amountRegex = Regex("Amount\\s*:\\s*(\\d+\\.?\\d*)")
-    return amountRegex.find(text)?.groupValues?.get(1) ?: "0.0"
+private fun extractBillAmount(text: String): String? {
+    // Regex to handle multi-line 'paid from T838' scenarios
+    val regex = Regex("""paid from\s+T?(\d{1,6})""", RegexOption.IGNORE_CASE)
+    val matchResult = regex.find(text)
+
+    return matchResult?.groupValues?.get(1) // Extract only the number after "paid from"
 }
 
 private fun processImageFromUri(mContext: Context, uri: Uri, onSuccess: (String) -> Unit) {
@@ -508,4 +528,32 @@ fun getPreviousThreeMonths(): List<String> {
     return (0..2).map {
         today.minusMonths(it.toLong()).format(formatter)
     }.reversed() // Reverse to show chronological order (earliest -> current)
+}
+
+fun convertToISODate(input: String): String? {
+    return try {
+        // Parse the input date string
+        val inputFormat = SimpleDateFormat("dd MMM yyyy", Locale.US)
+        val parsedDate = inputFormat.parse(input)
+
+        // Reformat the date into the desired format
+        val outputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        outputFormat.format(parsedDate!!)
+    } catch (e: Exception) {
+        null // Return null if parsing fails
+    }
+}
+
+fun extractMonthAndYear(text: String): Pair<String, String>? {
+    // Regex pattern to match dates like "22 Sep 2024"
+    val regex = Regex("""\b(\d{1,2})\s([A-Z][a-z]+)\s(\d{4})\b""")
+    val matchResult = regex.find(text)
+
+    return if (matchResult != null) {
+        val month = matchResult.groupValues[2] // Extract month name e.g. "Sep"
+        val year = matchResult.groupValues[3] // Extract year e.g. "2024"
+        Pair(month, year)
+    } else {
+        null
+    }
 }
