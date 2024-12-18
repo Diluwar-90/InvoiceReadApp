@@ -10,7 +10,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,25 +23,20 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
 import coil.compose.rememberAsyncImagePainter
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import convertMillisToDate
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.util.Date
 import java.util.Locale
 
@@ -175,27 +169,6 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
                         .fillMaxWidth()
                         .height(64.dp)
                 )
-
-               /* if (showDatePicker) {
-                    Popup(
-                        onDismissRequest = { showDatePicker = false },
-                        alignment = Alignment.TopStart
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .offset(y = 64.dp)
-                                .shadow(elevation = 4.dp)
-                                .background(MaterialTheme.colorScheme.surface)
-                                .padding(16.dp)
-                        ) {
-                            DatePicker(
-                                state = datePickerState,
-                                showModeToggle = true
-                            )
-                        }
-                    }
-                }*/
 
                 if (billEntryDatePickerState) {
                     DatePickerModal(
@@ -534,6 +507,5 @@ fun getPreviousThreeMonths(): List<String> {
     val formatter = DateTimeFormatter.ofPattern("MMM-yyyy", Locale.US)
     return (0..2).map {
         today.minusMonths(it.toLong()).format(formatter)
-        //month.getDisplayName(TextStyle.SHORT, Locale.US) // Get abbreviated names e.g., "Jan", "Feb"
     }.reversed() // Reverse to show chronological order (earliest -> current)
 }
