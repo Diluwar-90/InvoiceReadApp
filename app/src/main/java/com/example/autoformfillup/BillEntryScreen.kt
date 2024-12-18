@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,18 +22,24 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
 import coil.compose.rememberAsyncImagePainter
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import convertMillisToDate
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,7 +47,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
 
     val scrollState = rememberScrollState()
 
-    var billEntryDate by remember { mutableStateOf(TextFieldValue("")) }
+    var billEntryDate by remember { mutableStateOf("") }
     var billAmount by remember { mutableStateOf(TextFieldValue("")) }
     var monthYear by remember { mutableStateOf(TextFieldValue("")) }
     var eligibleBillAmount by remember { mutableStateOf(TextFieldValue("")) }
@@ -51,10 +58,20 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
     var expanded by remember { mutableStateOf(false) }
     var selectedOption by remember { mutableStateOf("-- Select Month --") }
     val options = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-    var billDate by remember { mutableStateOf(TextFieldValue("")) }
+    var billDate by remember { mutableStateOf("") }
     var receiptNum by remember { mutableStateOf(TextFieldValue("")) }
-    var billPeriodStartDate by remember { mutableStateOf(TextFieldValue("")) }
-    var billPeriodEndDate by remember { mutableStateOf(TextFieldValue("")) }
+    var billPeriodStartDate by remember { mutableStateOf("") }
+    var billPeriodEndDate by remember { mutableStateOf("") }
+
+    //var showDatePicker by remember { mutableStateOf(false) }
+    var billEntryDatePickerState by remember { mutableStateOf(false) }
+    var billDatePickerState by remember { mutableStateOf(false) }
+    var billStartDatePickerState by remember { mutableStateOf(false) }
+    var billEndDatePickerState by remember { mutableStateOf(false) }
+
+   /* var selectedDate = datePickerState.selectedDateMillis?.let {
+       convertMillisToDate(it)
+    } ?: ""*/
 
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -112,21 +129,62 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
         ) {
 
             //Bill Entry Date
-            OutlinedTextField(
-                value = billEntryDate,
-                onValueChange = {billEntryDate = it},
-                label = { Text("Entry Date") },
-                enabled = true,
-                trailingIcon =
-                    {
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = "Calendar"
-                        )
-                    },
-                singleLine = true,
+            Box(
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                OutlinedTextField(
+                    value = billEntryDate,
+                    onValueChange = { billEntryDate = it },
+                    label = { Text("Bill Entry Date") },
+                    readOnly = true,
+                    singleLine = true,
+                    trailingIcon = {
+                        IconButton(onClick = { billEntryDatePickerState = true }) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "Select date"
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                )
+
+               /* if (showDatePicker) {
+                    Popup(
+                        onDismissRequest = { showDatePicker = false },
+                        alignment = Alignment.TopStart
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .offset(y = 64.dp)
+                                .shadow(elevation = 4.dp)
+                                .background(MaterialTheme.colorScheme.surface)
+                                .padding(16.dp)
+                        ) {
+                            DatePicker(
+                                state = datePickerState,
+                                showModeToggle = true
+                            )
+                        }
+                    }
+                }*/
+
+                if (billEntryDatePickerState) {
+                    DatePickerModal(
+                        onDateSelected = { selectedDateMillis ->
+                            selectedDateMillis?.let {
+                                billEntryDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(it))
+                            }
+                            billEntryDatePickerState = false
+                        },
+                        onDismiss = { billEntryDatePickerState = false }
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             //Reimbursement month
             Box {
@@ -169,15 +227,30 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
                 label = { Text("Bill Date") },
                 enabled = true,
                 trailingIcon =
-                    {
+                {
+                    IconButton(onClick = { billDatePickerState = true }) {
                         Icon(
                             imageVector = Icons.Default.DateRange,
                             contentDescription = "Calendar"
                         )
-                    },
+                    }
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            if (billDatePickerState) {
+                DatePickerModal(
+                    onDateSelected = { selectedDateMillis ->
+                        selectedDateMillis?.let {
+                            billDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(it))
+                        }
+                        billDatePickerState = false
+                    },
+                    onDismiss = { billDatePickerState = false }
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             //Receipt Number
             OutlinedTextField(
@@ -196,16 +269,28 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
                 onValueChange = {billPeriodStartDate = it},
                 label = { Text("Bill Period Start Date") },
                 enabled = true,
-                trailingIcon =
-                    {
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = "Calendar"
-                        )
-                    },
+                trailingIcon = {
+                IconButton(onClick = { billStartDatePickerState = true }) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = "Calendar"
+                    )
+                }
+             },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+            if (billStartDatePickerState) {
+                DatePickerModal(
+                    onDateSelected = { selectedDateMillis ->
+                        selectedDateMillis?.let {
+                            billPeriodStartDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(it))
+                        }
+                        billStartDatePickerState = false
+                    },
+                    onDismiss = { billStartDatePickerState = false }
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
             //Bill Period End Dade
@@ -216,14 +301,28 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
                 enabled = true,
                 trailingIcon =
                     {
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = "Calendar"
-                        )
+                        IconButton(onClick = { billEndDatePickerState = true }) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "Calendar"
+                            )
+                        }
                     },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            if (billEndDatePickerState) {
+                DatePickerModal(
+                    onDateSelected = { selectedDateMillis ->
+                        selectedDateMillis?.let {
+                            billPeriodEndDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(it))
+                        }
+                        billEndDatePickerState = false
+                    },
+                    onDismiss = { billEndDatePickerState = false }
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -233,6 +332,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
                 onValueChange = { billAmount = it },
                 label = { Text("Bill Amount") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -243,6 +343,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
                 onValueChange = { eligibleBillAmount = it },
                 label = { Text("Eligible Amount") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -364,5 +465,38 @@ private fun saveImageToCache(context: Context, bitmap: Bitmap): Uri? {
     } catch (e: Exception) {
         e.printStackTrace()
         null
+    }
+}
+
+fun convertMillisToDate(millis: Long): String {
+    val formatter = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+    return formatter.format(Date(millis))
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DatePickerModal(
+    onDateSelected: (Long?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val datePickerState = rememberDatePickerState()
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                onDateSelected(datePickerState.selectedDateMillis)
+                onDismiss()
+            }) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    ) {
+        DatePicker(state = datePickerState)
     }
 }

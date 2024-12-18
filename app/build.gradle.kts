@@ -63,6 +63,7 @@ dependencies {
     // Required for viewModel() in Compose
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.text.recognition)
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.3.0")
 
 
     testImplementation(libs.junit)
