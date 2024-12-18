@@ -1,6 +1,5 @@
 package com.example.autoformfillup
 
-import DatePickerDocked
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -17,7 +16,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             AutoFormFillUpTheme {
                 BillEntryScreen()
-                //DatePickerDocked()
             }
         }
     }

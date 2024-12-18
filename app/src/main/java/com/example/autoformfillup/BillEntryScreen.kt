@@ -4,9 +4,11 @@ import android.Manifest
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -38,9 +40,13 @@ import convertMillisToDate
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.util.Date
 import java.util.Locale
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
@@ -48,16 +54,17 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
     val scrollState = rememberScrollState()
 
     var billEntryDate by remember { mutableStateOf("") }
-    var billAmount by remember { mutableStateOf(TextFieldValue("")) }
+    var billAmount by remember { mutableStateOf("") }
     var monthYear by remember { mutableStateOf(TextFieldValue("")) }
-    var eligibleBillAmount by remember { mutableStateOf(TextFieldValue("")) }
+    var eligibleBillAmount by remember { mutableStateOf("") }
     var billImageUri by remember { mutableStateOf<Uri?>(null) }
     var hasCameraPermission by rememberSaveable { mutableStateOf(false) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
     var selectedOption by remember { mutableStateOf("-- Select Month --") }
-    val options = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    //val options = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    val options = getPreviousThreeMonths()
     var billDate by remember { mutableStateOf("") }
     var receiptNum by remember { mutableStateOf(TextFieldValue("")) }
     var billPeriodStartDate by remember { mutableStateOf("") }
@@ -68,6 +75,21 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
     var billDatePickerState by remember { mutableStateOf(false) }
     var billStartDatePickerState by remember { mutableStateOf(false) }
     var billEndDatePickerState by remember { mutableStateOf(false) }
+
+
+    // Logic to enforce max eligible amount
+    fun handleBillAmountChange(value: String) {
+        billAmount = value
+
+        // Convert input to number safely
+        val enteredAmount = value.toIntOrNull() ?: 0
+        val maxEligibleAmount = 750
+
+        eligibleBillAmount = when {
+            enteredAmount >= maxEligibleAmount -> maxEligibleAmount.toString()
+            else -> enteredAmount.toString()
+        }
+    }
 
    /* var selectedDate = datePickerState.selectedDateMillis?.let {
        convertMillisToDate(it)
@@ -102,9 +124,9 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
             processImageFromUri(context,uri){ extractedText ->
                 Log.d("BillEntryScreen", "Extracted Text: $extractedText")
                 //fillFormWithExtractedText(extractedText)
-                billAmount = TextFieldValue(extractEmployeeName(extractedText))
+                billAmount = TextFieldValue(extractEmployeeName(extractedText)).toString()
                 monthYear = TextFieldValue(extractMonthYear(extractedText))
-                billAmount = TextFieldValue(extractBillAmount(extractedText))
+                billAmount = TextFieldValue(extractBillAmount(extractedText)).toString()
             }
             Log.d("BillEntryScreen", "Extracted Text: $uri")
         }
@@ -113,8 +135,11 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Mobile Bill Reimbursement") },
-                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color(0xFF6200EA)),
+                title = { Text(
+                    text = "Mobile Bill Reimbursement",
+                    color = MaterialTheme.colorScheme.onPrimary
+                ) },
+                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.primary),
             )
         }
     ) { padding ->
@@ -191,6 +216,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
                 OutlinedTextField(
                     value = selectedOption,
                     onValueChange = {},
+                    label = { Text("Reimbursement Month")},
                     readOnly = true,
                     trailingIcon = {
                         Icon(
@@ -329,7 +355,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
             // Bill Amount
             OutlinedTextField(
                 value = billAmount,
-                onValueChange = { billAmount = it },
+                onValueChange = { handleBillAmountChange(it) },
                 label = { Text("Bill Amount") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
@@ -344,6 +370,7 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
                 label = { Text("Eligible Amount") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
+                enabled = false,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -373,9 +400,9 @@ fun BillEntryScreen(viewModel: BillEntryViewModel = androidx.lifecycle.viewmodel
             Button(
                 onClick = {
                     val mobileBill = MobileBill(
-                        employeeName = billAmount.text,
+                        employeeName = billAmount,
                         monthYear = monthYear.text,
-                        billAmount = billAmount.text.toDoubleOrNull() ?: 0.0,
+                        billAmount = billAmount.toDoubleOrNull() ?: 0.0,
                         billImageUri = billImageUri.toString()
                     )
                     viewModel.submitBill(mobileBill)
@@ -499,4 +526,14 @@ fun DatePickerModal(
     ) {
         DatePicker(state = datePickerState)
     }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+fun getPreviousThreeMonths(): List<String> {
+    val today = LocalDate.now()
+    val formatter = DateTimeFormatter.ofPattern("MMM-yyyy", Locale.US)
+    return (0..2).map {
+        today.minusMonths(it.toLong()).format(formatter)
+        //month.getDisplayName(TextStyle.SHORT, Locale.US) // Get abbreviated names e.g., "Jan", "Feb"
+    }.reversed() // Reverse to show chronological order (earliest -> current)
 }
